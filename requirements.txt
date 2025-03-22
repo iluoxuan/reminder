@@ -1,5 +1,4 @@
-PySide6==6.6.1
-schedule==1.2.1
-pillow==10.2.0
-pywin32==306
-pyinstaller==6.5.0 
+PyQt5==5.15.9
+schedule==1.2.0
+plyer==2.1.0
+py2app==0.28.6 
