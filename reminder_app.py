@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QSpinBox, 
                              QComboBox, QSystemTrayIcon, QMenu, QMessageBox,
                              QStackedWidget, QFrame, QLineEdit, QTimeEdit,
-                             QGraphicsOpacityEffect)
+                             QGraphicsOpacityEffect, QTabWidget, QGraphicsDropShadowEffect)
 from PySide6.QtCore import Qt, QTimer, QSize, QTime, QEvent, QPropertyAnimation, QPoint, Property
 from PySide6.QtGui import QIcon, QFont, QPixmap, QColor, QPalette
 import win32com.client
@@ -22,14 +22,20 @@ class MaterialLineEdit(QLineEdit):
         self.setStyleSheet("""
             QLineEdit {
                 border: none;
-                border-bottom: 2px solid #E0E0E0;
-                padding: 8px;
-                background: transparent;
-                color: #333333;
+                border-radius: 4px;
+                padding: 8px 12px;
+                background: #F5F6F7;
+                color: #1F2329;
                 font-size: 14px;
+                min-height: 20px;
             }
             QLineEdit:focus {
-                border-bottom: 2px solid #2196F3;
+                background: #FFFFFF;
+                border: 1px solid #1677FF;
+            }
+            QLineEdit:hover {
+                background: #FFFFFF;
+                border: 1px solid #4096FF;
             }
         """)
 
@@ -39,10 +45,16 @@ class CardFrame(QFrame):
         self.setStyleSheet("""
             CardFrame {
                 background-color: white;
-                border-radius: 12px;
-                padding: 20px;
+                border-radius: 8px;
+                border: none;
             }
         """)
+        # 更柔和的阴影效果
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(16)
+        shadow.setColor(QColor(0, 0, 0, 10))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
         self.setAttribute(Qt.WA_StyledBackground, True)
 
 class QShowReminderEvent(QEvent):
@@ -96,116 +108,167 @@ class ReminderApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("提醒助手")
-        self.setFixedSize(420, 680)
+        self.setFixedSize(680, 580)
         
-        # Material Design 颜色
+        # 初始化语音引擎
+        self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
+        
+        # 配色方案 - 清新简约风格
         self.colors = {
-            'primary': '#2196F3',
-            'primary_dark': '#1976D2',
-            'accent': '#FF4081',
-            'background': '#F5F7FA',
-            'card': '#FFFFFF',
-            'error': '#F44336',
-            'text_primary': '#2C3E50',
-            'text_secondary': '#607D8B',
-            'divider': '#E0E0E0'
+            'primary': '#1890FF',      # 主色调：清新蓝
+            'background': '#F5F7FA',   # 背景色：浅灰白
+            'sidebar': '#FFFFFF',      # 侧边栏：纯白
+            'card': '#FFFFFF',         # 卡片色：纯白
+            'text': '#1D2129',         # 主要文字：深灰
+            'text_secondary': '#4E5969', # 次要文字：中灰
+            'border': '#E5E6EB',       # 边框色：浅灰
+            'hover': '#E8F3FF',        # 悬停色：淡蓝
+            'input_bg': '#F5F7FA',     # 输入框背景：浅灰
+            'success': '#52C41A',      # 成功色：清新绿
+            'error': '#FF4D4F',        # 错误色：点睛红
         }
         
+        # 设置全局样式
         self.setStyleSheet(f"""
             QMainWindow {{
                 background-color: {self.colors['background']};
             }}
             QLabel {{
-                color: {self.colors['text_primary']};
+                color: {self.colors['text']};
                 font-size: 14px;
+                font-weight: 400;
             }}
             QPushButton {{
                 background-color: {self.colors['primary']};
                 color: white;
                 border: none;
-                padding: 12px;
-                border-radius: 6px;
-                font-size: 15px;
-                font-weight: bold;
-                min-width: 120px;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 14px;
+                min-height: 36px;
             }}
             QPushButton:hover {{
-                background-color: {self.colors['primary_dark']};
+                background-color: #40A9FF;
             }}
             QPushButton:pressed {{
-                background-color: {self.colors['primary']};
-                padding: 14px 10px 10px 14px;
+                background-color: #096DD9;
             }}
             QSpinBox, QComboBox, QTimeEdit {{
-                padding: 8px;
-                border: 2px solid {self.colors['divider']};
-                border-radius: 6px;
+                border: 1px solid {self.colors['border']};
+                border-radius: 4px;
+                padding: 4px 12px;
                 background-color: white;
-                min-height: 20px;
-                min-width: 150px;
+                color: {self.colors['text']};
+                min-height: 36px;
                 font-size: 14px;
-                selection-background-color: {self.colors['primary']};
             }}
             QSpinBox:focus, QComboBox:focus, QTimeEdit:focus {{
-                border: 2px solid {self.colors['primary']};
+                border: 1px solid {self.colors['primary']};
             }}
-            QComboBox::drop-down {{
-                border: none;
-                padding-right: 20px;
-            }}
-            QSpinBox::up-button, QSpinBox::down-button {{
-                width: 20px;
-            }}
-            QTimeEdit::up-button, QTimeEdit::down-button {{
-                width: 20px;
+            QSpinBox:hover, QComboBox:hover, QTimeEdit:hover {{
+                border: 1px solid {self.colors['primary']};
             }}
         """)
-        
-        # 设置窗口图标
-        self.setWindowIcon(QIcon("icon.ico"))
-        
-        # 创建并设置系统托盘图标
-        self.setup_tray_icon()
         
         # 创建主窗口部件
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         
         # 创建主布局
-        main_layout = QVBoxLayout(main_widget)
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout = QHBoxLayout(main_widget)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 创建标题卡片
-        title_card = CardFrame()
-        title_layout = QVBoxLayout(title_card)
-        title_layout.setContentsMargins(0, 0, 0, 0)
-        
-        title_label = QLabel("提醒助手")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet(f"""
-            font-size: 32px;
-            font-weight: bold;
-            color: {self.colors['primary']};
-            margin: 10px 0;
+        # 创建左侧边栏
+        sidebar = QWidget()
+        sidebar.setFixedWidth(60)  # 恢复原来的宽度
+        sidebar.setStyleSheet(f"""
+            QWidget {{
+                background-color: {self.colors['sidebar']};
+                border-right: 1px solid {self.colors['border']};
+            }}
+            QPushButton {{
+                background-color: transparent;
+                color: {self.colors['text_secondary']};
+                border: none;
+                border-radius: 4px;
+                text-align: center;
+                padding: 12px 0;
+                font-size: 13px;
+                min-height: 24px;
+                margin: 4px 8px;
+            }}
+            QPushButton:hover {{
+                color: {self.colors['primary']};
+                background-color: {self.colors['hover']};
+            }}
+            QPushButton[selected=true] {{
+                color: {self.colors['primary']};
+                background-color: {self.colors['hover']};
+                font-weight: 500;
+            }}
         """)
-        title_layout.addWidget(title_label)
-        main_layout.addWidget(title_card)
         
-        # 创建设置卡片
+        # 创建侧边栏布局
+        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout.setSpacing(0)
+        sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 添加功能按钮
+        self.reminder_btn = QPushButton("提醒")
+        self.reminder_btn.setProperty("selected", True)
+        self.reminder_btn.clicked.connect(lambda: self.switch_page(0))
+        
+        self.sleep_btn = QPushButton("计划")
+        self.sleep_btn.setProperty("selected", False)
+        self.sleep_btn.clicked.connect(lambda: self.switch_page(1))
+        
+        self.settings_btn = QPushButton("设置")
+        self.settings_btn.setProperty("selected", False)
+        self.settings_btn.clicked.connect(lambda: self.switch_page(2))
+        
+        sidebar_layout.addWidget(self.reminder_btn)
+        sidebar_layout.addWidget(self.sleep_btn)
+        sidebar_layout.addStretch()
+        sidebar_layout.addWidget(self.settings_btn)
+        
+        # 创建右侧内容区
+        content = QWidget()
+        content.setStyleSheet(f"""
+            QWidget {{
+                background-color: {self.colors['background']};
+            }}
+        """)
+        
+        content_layout = QVBoxLayout(content)
+        content_layout.setSpacing(16)
+        content_layout.setContentsMargins(20, 20, 20, 20)
+        
+        # 创建堆叠部件用于切换页面
+        self.stack = QStackedWidget()
+        
+        # 创建提醒设置页面
+        reminder_page = QWidget()
+        reminder_layout = QVBoxLayout(reminder_page)
+        reminder_layout.setSpacing(20)
+        reminder_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 创建提醒设置卡片
         settings_card = CardFrame()
         settings_layout = QVBoxLayout(settings_card)
         settings_layout.setSpacing(20)
+        settings_layout.setContentsMargins(24, 24, 24, 24)
         
         # 提醒类型选择
         type_layout = QHBoxLayout()
         type_label = QLabel("提醒类型")
-        type_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-weight: bold;")
         self.type_combo = QComboBox()
         self.type_combo.addItems(["喝水", "运动", "休息", "自定义"])
         self.type_combo.currentTextChanged.connect(self.on_type_changed)
         type_layout.addWidget(type_label)
         type_layout.addWidget(self.type_combo)
+        type_layout.setStretchFactor(type_label, 1)
+        type_layout.setStretchFactor(self.type_combo, 2)
         settings_layout.addLayout(type_layout)
         
         # 自定义提醒文本
@@ -213,108 +276,412 @@ class ReminderApp(QMainWindow):
         self.custom_text_layout = QHBoxLayout(self.custom_text_widget)
         self.custom_text_layout.setContentsMargins(0, 0, 0, 0)
         custom_text_label = QLabel("自定义文本")
-        custom_text_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-weight: bold;")
         self.custom_text_input = MaterialLineEdit()
         self.custom_text_input.setPlaceholderText("请输入提醒文本")
         self.custom_text_layout.addWidget(custom_text_label)
         self.custom_text_layout.addWidget(self.custom_text_input)
+        self.custom_text_layout.setStretchFactor(custom_text_label, 1)
+        self.custom_text_layout.setStretchFactor(self.custom_text_input, 2)
         settings_layout.addWidget(self.custom_text_widget)
         self.custom_text_widget.hide()
         
         # 提醒间隔设置
         interval_layout = QHBoxLayout()
         interval_label = QLabel("提醒间隔")
-        interval_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-weight: bold;")
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 120)
         self.interval_spin.setValue(30)
         self.interval_spin.setSuffix(" 分钟")
         interval_layout.addWidget(interval_label)
         interval_layout.addWidget(self.interval_spin)
+        interval_layout.setStretchFactor(interval_label, 1)
+        interval_layout.setStretchFactor(self.interval_spin, 2)
         settings_layout.addLayout(interval_layout)
         
-        # 添加定时提醒
+        # 定时提醒设置
         time_layout = QHBoxLayout()
         time_label = QLabel("定时提醒")
-        time_label.setStyleSheet(f"color: {self.colors['text_primary']}; font-weight: bold;")
         self.time_edit = QTimeEdit()
         self.time_edit.setTime(QTime.currentTime())
         time_layout.addWidget(time_label)
         time_layout.addWidget(self.time_edit)
+        time_layout.setStretchFactor(time_label, 1)
+        time_layout.setStretchFactor(self.time_edit, 2)
         settings_layout.addLayout(time_layout)
         
-        main_layout.addWidget(settings_card)
+        # 添加按钮布局
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(16)
         
-        # 创建按钮卡片
-        button_card = CardFrame()
-        button_layout = QVBoxLayout(button_card)
-        button_layout.setSpacing(15)
+        # 开始/停止按钮
+        self.toggle_button = QPushButton("启动专注时段")
+        self.toggle_button.setFixedWidth(160)  # 增加按钮宽度
+        self.toggle_button.clicked.connect(self.toggle_reminder)
+        button_layout.addWidget(self.toggle_button)
         
-        # 开始/停止提醒按钮
-        self.start_button = QPushButton("开始提醒")
-        self.start_button.clicked.connect(self.toggle_reminder)
-        button_layout.addWidget(self.start_button)
+        button_layout.addStretch()
+        settings_layout.addLayout(button_layout)
         
-        # 打赏支持按钮
-        self.donate_button = QPushButton("打赏支持")
-        self.donate_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['accent']};
-                color: white;
-            }}
-            QPushButton:hover {{
-                background-color: #E91E63;
+        reminder_layout.addWidget(settings_card)
+        reminder_layout.addStretch()
+        
+        # 创建睡眠设置页面
+        sleep_page = QWidget()
+        sleep_layout = QVBoxLayout(sleep_page)
+        sleep_layout.setSpacing(20)
+        sleep_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 创建睡眠设置卡片
+        sleep_card = CardFrame()
+        sleep_settings_layout = QVBoxLayout(sleep_card)
+        sleep_settings_layout.setSpacing(20)
+        sleep_settings_layout.setContentsMargins(24, 24, 24, 24)
+        
+        # 睡眠时间设置
+        sleep_time_layout = QHBoxLayout()
+        sleep_time_label = QLabel("睡眠时间")
+        sleep_time_label.setStyleSheet(f"""
+            QLabel {{
+                color: {self.colors['text']};
+                font-size: 14px;
+                font-weight: 400;
             }}
         """)
-        self.donate_button.clicked.connect(self.show_donate)
-        button_layout.addWidget(self.donate_button)
+        self.sleep_time_spin = QSpinBox()
+        self.sleep_time_spin.setRange(1, 120)
+        self.sleep_time_spin.setValue(20)
+        self.sleep_time_spin.setSuffix(" 分钟")
+        self.sleep_time_spin.setStyleSheet(f"""
+            QSpinBox {{
+                border: 1px solid {self.colors['border']};
+                border-radius: 4px;
+                padding: 4px 12px;
+                background-color: white;
+                color: {self.colors['text']};
+                min-height: 36px;
+                font-size: 24px;
+                font-weight: 500;
+            }}
+            QSpinBox:hover {{
+                border: 1px solid {self.colors['primary']};
+            }}
+            QSpinBox:focus {{
+                border: 1px solid {self.colors['primary']};
+            }}
+            QSpinBox::up-button, QSpinBox::down-button {{
+                width: 0;
+                border: none;
+                background: transparent;
+            }}
+            QSpinBox::up-arrow, QSpinBox::down-arrow {{
+                width: 0;
+                height: 0;
+                border: none;
+            }}
+        """)
+        sleep_time_layout.addWidget(sleep_time_label)
+        sleep_time_layout.addWidget(self.sleep_time_spin)
+        sleep_time_layout.setStretchFactor(sleep_time_label, 1)
+        sleep_time_layout.setStretchFactor(self.sleep_time_spin, 2)
+        sleep_settings_layout.addLayout(sleep_time_layout)
         
-        # 开机自启按钮
+        # 添加睡眠按钮布局
+        sleep_button_layout = QHBoxLayout()
+        sleep_button_layout.setSpacing(16)
+        
+        # 设置睡眠按钮
+        self.sleep_button = QPushButton("设置睡眠")
+        self.sleep_button.setFixedWidth(160)  # 增加按钮宽度
+        self.sleep_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['primary']};
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 14px;
+                min-height: 40px;
+                text-align: left;
+                padding-left: 20px;
+                background-image: url(play.png);
+                background-repeat: no-repeat;
+                background-position: 120px center;
+                background-size: 16px 16px;
+            }}
+            QPushButton:hover {{
+                background-color: #40A9FF;
+            }}
+            QPushButton:pressed {{
+                background-color: #096DD9;
+            }}
+        """)
+        self.sleep_button.clicked.connect(self.set_sleep)
+        sleep_button_layout.addWidget(self.sleep_button)
+        
+        # 取消睡眠按钮
+        self.cancel_sleep_button = QPushButton("取消睡眠")
+        self.cancel_sleep_button.setFixedWidth(160)  # 增加按钮宽度
+        self.cancel_sleep_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FF4D4F;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 14px;
+                min-height: 40px;
+                text-align: left;
+                padding-left: 20px;
+                background-image: url(stop.png);
+                background-repeat: no-repeat;
+                background-position: 120px center;
+                background-size: 16px 16px;
+            }}
+            QPushButton:hover {{
+                background-color: #ff7875;
+            }}
+            QPushButton:pressed {{
+                background-color: #d4380d;
+            }}
+            QPushButton:disabled {{
+                background-color: #FFB5B5;
+                color: rgba(255, 255, 255, 0.65);
+            }}
+        """)
+        self.cancel_sleep_button.clicked.connect(self.cancel_sleep)
+        self.cancel_sleep_button.setEnabled(False)
+        sleep_button_layout.addWidget(self.cancel_sleep_button)
+        
+        sleep_button_layout.addStretch()
+        sleep_settings_layout.addLayout(sleep_button_layout)
+        
+        sleep_layout.addWidget(sleep_card)
+        sleep_layout.addStretch()
+        
+        # 创建设置页面
+        settings_page = QWidget()
+        settings_page_layout = QVBoxLayout(settings_page)
+        settings_page_layout.setSpacing(20)
+        settings_page_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 创建设置卡片
+        settings_card = CardFrame()
+        settings_card_layout = QVBoxLayout(settings_card)
+        settings_card_layout.setSpacing(20)
+        settings_card_layout.setContentsMargins(24, 24, 24, 24)
+        
+        # 开机自启动设置
         self.autostart_button = QPushButton("设置开机自启")
-        self.autostart_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['text_secondary']};
-                color: white;
-            }}
-            QPushButton:hover {{
-                background-color: #546E7A;
-            }}
-        """)
         self.autostart_button.clicked.connect(self.toggle_autostart)
-        button_layout.addWidget(self.autostart_button)
+        settings_card_layout.addWidget(self.autostart_button)
         
-        main_layout.addWidget(button_card)
+        settings_page_layout.addWidget(settings_card)
+        settings_page_layout.addStretch()
         
-        # 创建状态卡片
-        status_card = CardFrame()
-        status_layout = QVBoxLayout(status_card)
-        status_layout.setContentsMargins(0, 0, 0, 0)
+        # 将页面添加到堆叠部件
+        self.stack.addWidget(reminder_page)
+        self.stack.addWidget(sleep_page)
+        self.stack.addWidget(settings_page)
         
-        self.status_label = QLabel()
-        self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setStyleSheet(f"""
-            color: {self.colors['text_secondary']};
-            font-size: 13px;
-        """)
-        status_layout.addWidget(self.status_label)
-        main_layout.addWidget(status_card)
+        content_layout.addWidget(self.stack)
         
-        # 创建全屏提醒窗口
-        self.setup_reminder_window()
+        # 添加到主布局
+        main_layout.addWidget(sidebar)
+        main_layout.addWidget(content)
         
-        # 初始化变量
-        self.reminder_active = False
+        # 初始化其他变量和设置
         self.reminder_thread = None
-        self.scheduled_time = None
-        self.current_language = "中文"
-        self.load_language()
+        self.reminder_running = False
+        self.reminder_window = None
+        self.shell = win32com.client.Dispatch("WScript.Shell")
+        self.sleep_timer = None
         
-        # 检查开机自启状态
+        # 设置窗口图标
+        self.setWindowIcon(QIcon("icon.ico"))
+        
+        # 创建并设置系统托盘图标
+        self.setup_tray_icon()
+        
+        # 检查开机自启动状态
         self.check_autostart()
         
-        # 设置窗口位置
+        # 设置窗口居中
         self.center_window()
         
+        # 设置提醒窗口
+        self.setup_reminder_window()
+
+        # 修改启动按钮样式
+        self.toggle_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #1890FF;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 14px;
+                min-height: 40px;
+                text-align: left;
+                padding-left: 20px;
+                background-image: url(play.png);
+                background-repeat: no-repeat;
+                background-position: 120px center;
+                background-size: 16px 16px;
+            }}
+            QPushButton:hover {{
+                background-color: #40A9FF;
+            }}
+            QPushButton:pressed {{
+                background-color: #096DD9;
+            }}
+        """)
+
+        # 修改停止按钮样式
+        self.stop_button_style = f"""
+            QPushButton {{
+                background-color: #FF4D4F;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 14px;
+                min-height: 40px;
+                text-align: left;
+                padding-left: 20px;
+                background-image: url(stop.png);
+                background-repeat: no-repeat;
+                background-position: 120px center;
+                background-size: 16px 16px;
+            }}
+            QPushButton:hover {{
+                background-color: #FF7875;
+            }}
+            QPushButton:pressed {{
+                background-color: #D4380D;
+            }}
+        """
+
+        # 修改卡片样式
+        settings_card.setStyleSheet("""
+            CardFrame {
+                background-color: white;
+                border-radius: 8px;
+                border: none;
+            }
+        """)
+
+        # 修改下拉框样式
+        self.type_combo.setStyleSheet(f"""
+            QComboBox {{
+                border: 1px solid {self.colors['border']};
+                border-radius: 4px;
+                padding: 4px 12px;
+                background-color: white;
+                color: {self.colors['text']};
+                min-height: 36px;
+                font-size: 14px;
+            }}
+            QComboBox:hover {{
+                border: 1px solid {self.colors['primary']};
+            }}
+            QComboBox:focus {{
+                border: 1px solid {self.colors['primary']};
+            }}
+            QComboBox::drop-down {{
+                width: 0;
+                border: none;
+                background: transparent;
+            }}
+            QComboBox::down-arrow {{
+                width: 0;
+                height: 0;
+                border: none;
+            }}
+            QComboBox QAbstractItemView {{
+                border: 1px solid {self.colors['border']};
+                background-color: white;
+                color: {self.colors['text']};
+                selection-background-color: {self.colors['hover']};
+                selection-color: {self.colors['primary']};
+            }}
+        """)
+
+        # 修改数字输入框样式
+        self.interval_spin.setStyleSheet(f"""
+            QSpinBox {{
+                border: 1px solid {self.colors['border']};
+                border-radius: 4px;
+                padding: 4px 12px;
+                background-color: white;
+                color: {self.colors['text']};
+                min-height: 36px;
+                font-size: 24px;
+                font-weight: 500;
+            }}
+            QSpinBox:hover {{
+                border: 1px solid {self.colors['primary']};
+            }}
+            QSpinBox:focus {{
+                border: 1px solid {self.colors['primary']};
+            }}
+            QSpinBox::up-button, QSpinBox::down-button {{
+                width: 0;
+                border: none;
+                background: transparent;
+            }}
+            QSpinBox::up-arrow, QSpinBox::down-arrow {{
+                width: 0;
+                height: 0;
+                border: none;
+            }}
+        """)
+
+        # 修改时间输入框样式
+        self.time_edit.setStyleSheet(f"""
+            QTimeEdit {{
+                border: 1px solid {self.colors['border']};
+                border-radius: 4px;
+                padding: 4px 12px;
+                background-color: white;
+                color: {self.colors['text']};
+                min-height: 36px;
+                font-size: 14px;
+            }}
+            QTimeEdit:hover {{
+                border: 1px solid {self.colors['primary']};
+            }}
+            QTimeEdit:focus {{
+                border: 1px solid {self.colors['primary']};
+            }}
+            QTimeEdit::up-button, QTimeEdit::down-button {{
+                width: 0;
+                border: none;
+                background: transparent;
+            }}
+            QTimeEdit::up-arrow, QTimeEdit::down-arrow {{
+                width: 0;
+                height: 0;
+                border: none;
+            }}
+        """)
+
+    def switch_page(self, index):
+        """切换页面"""
+        self.stack.setCurrentIndex(index)
+        
+        # 更新按钮选中状态
+        self.reminder_btn.setProperty("selected", index == 0)
+        self.sleep_btn.setProperty("selected", index == 1)
+        self.settings_btn.setProperty("selected", index == 2)
+        
+        # 刷新样式
+        self.reminder_btn.style().unpolish(self.reminder_btn)
+        self.reminder_btn.style().polish(self.reminder_btn)
+        self.sleep_btn.style().unpolish(self.sleep_btn)
+        self.sleep_btn.style().polish(self.sleep_btn)
+        self.settings_btn.style().unpolish(self.settings_btn)
+        self.settings_btn.style().polish(self.settings_btn)
+
     def on_type_changed(self, text):
         """当提醒类型改变时调用"""
         self.custom_text_widget.setVisible(text == "自定义")
@@ -358,25 +725,18 @@ class ReminderApp(QMainWindow):
         
     def toggle_reminder(self):
         """切换提醒状态"""
-        if not self.reminder_active:
+        if not self.reminder_running:
             self.start_reminder()
         else:
             self.stop_reminder()
             
     def start_reminder(self):
         """开始提醒"""
-        self.reminder_active = True
-        self.start_button.setText(self.get_text("停止提醒"))
-        self.start_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['error']};
-                color: white;
-            }}
-            QPushButton:hover {{
-                background-color: #D32F2F;
-            }}
-        """)
-        self.status_label.setText("提醒已开启")
+        self.reminder_running = True
+        self.toggle_button.setText("停止专注时段")
+        self.toggle_button.setStyleSheet(self.stop_button_style)
+        if hasattr(self, 'status_label'):
+            self.status_label.setText("提醒已开启")
         self.reminder_thread = threading.Thread(target=self.reminder_loop)
         self.reminder_thread.daemon = True
         self.reminder_thread.start()
@@ -384,10 +744,33 @@ class ReminderApp(QMainWindow):
     def stop_reminder(self):
         """停止提醒"""
         try:
-            self.reminder_active = False
-            self.start_button.setText(self.get_text("开始提醒"))
-            self.start_button.setStyleSheet("")
-            self.status_label.setText("提醒已停止")
+            self.reminder_running = False
+            self.toggle_button.setText("启动专注时段")
+            self.toggle_button.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: #1890FF;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 8px 16px;
+                    font-size: 14px;
+                    min-height: 40px;
+                    text-align: left;
+                    padding-left: 20px;
+                    background-image: url(play.png);
+                    background-repeat: no-repeat;
+                    background-position: 120px center;
+                    background-size: 16px 16px;
+                }}
+                QPushButton:hover {{
+                    background-color: #40A9FF;
+                }}
+                QPushButton:pressed {{
+                    background-color: #096DD9;
+                }}
+            """)
+            if hasattr(self, 'status_label'):
+                self.status_label.setText("提醒已停止")
             if self.reminder_thread and self.reminder_thread.is_alive():
                 self.reminder_thread.join(timeout=1)
             self.hide_reminder()
@@ -398,7 +781,7 @@ class ReminderApp(QMainWindow):
         """提醒循环"""
         last_reminder_time = datetime.now()
         
-        while self.reminder_active:
+        while self.reminder_running:
             try:
                 current_time = datetime.now()
                 scheduled_time = self.time_edit.time().toPython()
@@ -469,6 +852,9 @@ class ReminderApp(QMainWindow):
     def play_sound(self):
         """播放提示音"""
         try:
+            if not hasattr(self, 'speaker'):
+                self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
+            
             reminder_type = self.type_combo.currentText()
             if reminder_type == "自定义":
                 text = self.custom_text_input.text() or "自定义提醒"
@@ -570,14 +956,12 @@ class ReminderApp(QMainWindow):
                 winreg.QueryValueEx(key, "ReminderApp")
                 # 如果存在，则删除
                 winreg.DeleteValue(key, "ReminderApp")
-                self.autostart_button.setText(self.get_text("设置开机自启"))
-                self.status_label.setText("已取消开机自启")
+                self.autostart_button.setText("设置开机自启")
             except:
                 # 如果不存在，则添加
                 app_path = os.path.abspath(sys.argv[0])
                 winreg.SetValueEx(key, "ReminderApp", 0, winreg.REG_SZ, app_path)
-                self.autostart_button.setText(self.get_text("取消开机自启"))
-                self.status_label.setText("已设置开机自启")
+                self.autostart_button.setText("取消开机自启")
                 
             winreg.CloseKey(key)
         except Exception as e:
@@ -592,40 +976,49 @@ class ReminderApp(QMainWindow):
             
             try:
                 winreg.QueryValueEx(key, "ReminderApp")
-                self.autostart_button.setText(self.get_text("取消开机自启"))
+                self.autostart_button.setText("取消开机自启")
             except:
-                self.autostart_button.setText(self.get_text("设置开机自启"))
+                self.autostart_button.setText("设置开机自启")
                 
             winreg.CloseKey(key)
         except:
-            self.autostart_button.setText(self.get_text("设置开机自启"))
+            self.autostart_button.setText("设置开机自启")
             
     def setup_tray_icon(self):
         """设置系统托盘图标"""
-        self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon("icon.ico"))
-        self.tray_icon.setToolTip("提醒助手")  # 添加悬停提示
-        
-        # 创建托盘菜单
-        tray_menu = QMenu()
-        
-        # 添加菜单项
-        show_action = tray_menu.addAction("显示主窗口")
-        show_action.triggered.connect(self.show_main_window)
-        
-        tray_menu.addSeparator()  # 添加分隔线
-        
-        quit_action = tray_menu.addAction("退出程序")
-        quit_action.triggered.connect(self.quit_app)
-        
-        # 设置托盘图标的上下文菜单
-        self.tray_icon.setContextMenu(tray_menu)
-        
-        # 添加托盘图标的双击事件
-        self.tray_icon.activated.connect(self.tray_icon_activated)
-        
-        # 显示托盘图标
-        self.tray_icon.show()
+        try:
+            self.tray_icon = QSystemTrayIcon(self)
+            icon = QIcon("icon.ico")
+            if icon.isNull():
+                # 如果图标文件不存在，创建一个默认图标
+                pixmap = QPixmap(32, 32)
+                pixmap.fill(QColor(self.colors['primary']))
+                icon = QIcon(pixmap)
+            self.tray_icon.setIcon(icon)
+            self.tray_icon.setToolTip("提醒助手")
+            
+            # 创建托盘菜单
+            tray_menu = QMenu()
+            
+            # 添加菜单项
+            show_action = tray_menu.addAction("显示主窗口")
+            show_action.triggered.connect(self.show_main_window)
+            
+            tray_menu.addSeparator()
+            
+            quit_action = tray_menu.addAction("退出程序")
+            quit_action.triggered.connect(self.quit_app)
+            
+            # 设置托盘图标的上下文菜单
+            self.tray_icon.setContextMenu(tray_menu)
+            
+            # 添加托盘图标的双击事件
+            self.tray_icon.activated.connect(self.tray_icon_activated)
+            
+            # 显示托盘图标
+            self.tray_icon.show()
+        except Exception as e:
+            print(f"设置系统托盘图标出错: {e}")
         
     def show_main_window(self):
         """显示主窗口"""
@@ -775,6 +1168,35 @@ class ReminderApp(QMainWindow):
             self.show_reminder()
             return True
         return super().event(event)
+
+    def set_sleep(self):
+        """设置系统睡眠"""
+        minutes = self.sleep_time_spin.value()
+        self.sleep_button.setEnabled(False)
+        self.cancel_sleep_button.setEnabled(True)
+        
+        # 创建定时器
+        self.sleep_timer = QTimer()
+        self.sleep_timer.timeout.connect(self.execute_sleep)
+        self.sleep_timer.start(minutes * 60 * 1000)  # 转换为毫秒
+        
+        QMessageBox.information(self, "睡眠设置", f"系统将在 {minutes} 分钟后进入睡眠模式")
+        
+    def cancel_sleep(self):
+        """取消系统睡眠"""
+        if self.sleep_timer:
+            self.sleep_timer.stop()
+            self.sleep_timer = None
+            self.sleep_button.setEnabled(True)
+            self.cancel_sleep_button.setEnabled(False)
+            QMessageBox.information(self, "睡眠设置", "已取消睡眠设置")
+            
+    def execute_sleep(self):
+        """执行系统睡眠"""
+        os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+        self.sleep_button.setEnabled(True)
+        self.cancel_sleep_button.setEnabled(False)
+        self.sleep_timer = None
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
