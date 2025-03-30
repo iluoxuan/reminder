@@ -1,7 +1,6 @@
 import sys
 import json
 import os
-import schedule
 import time
 import threading
 import random
@@ -10,10 +9,9 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QSpinBox, 
                              QComboBox, QSystemTrayIcon, QMenu, QMessageBox,
                              QStackedWidget, QFrame, QLineEdit, QTimeEdit,
-                             QGraphicsOpacityEffect, QTabWidget, QGraphicsDropShadowEffect)
-from PySide6.QtCore import Qt, QTimer, QSize, QTime, QEvent, QPropertyAnimation, QPoint, Property
-from PySide6.QtGui import QIcon, QFont, QPixmap, QColor, QPalette
-import win32com.client
+                             QGraphicsOpacityEffect, QGraphicsDropShadowEffect)
+from PySide6.QtCore import Qt, QTimer, QTime, QEvent, QPropertyAnimation, QPoint
+from PySide6.QtGui import QIcon, QPixmap, QColor
 import winreg
 
 class MaterialLineEdit(QLineEdit):
@@ -104,14 +102,85 @@ class DanmakuLabel(QLabel):
         self.pos_anim.start()
         self.pos_anim.finished.connect(self.deleteLater)
 
+class DonateWidget(QWidget):
+    """打赏组件"""
+    def __init__(self, parent=None, get_text_func=None):
+        super().__init__(parent)
+        self.get_text = get_text_func
+        self.setup_ui()
+        
+    def setup_ui(self):
+        layout = QHBoxLayout(self)  # 改为水平布局
+        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)  # 移除边距
+        
+        # 创建卡片式容器
+        container = QFrame(self)
+        container.setObjectName("donateCard")
+        container.setStyleSheet("""
+            #donateCard {
+                background-color: white;
+                border-radius: 6px;
+                padding: 8px;
+            }
+        """)
+        
+        card_layout = QHBoxLayout(container)  # 改为水平布局
+        card_layout.setSpacing(8)
+        card_layout.setContentsMargins(12, 8, 12, 8)  # 减小内边距
+        
+        # 添加文字容器
+        text_container = QVBoxLayout()
+        text_container.setSpacing(2)  # 减小文字间距
+        text_container.setAlignment(Qt.AlignVCenter)  # 垂直居中对齐
+        
+        # 添加标题
+        title_label = QLabel("❤️ " + self.get_text("支持作者"))
+        title_label.setStyleSheet("""
+            QLabel {
+                color: #1F2329;
+                font-size: 14px;
+                font-weight: bold;
+            }
+        """)
+        text_container.addWidget(title_label)
+        
+        # 添加描述文本
+        desc_label = QLabel(self.get_text("如果这个工具对你有帮助，欢迎微信扫码支持"))
+        desc_label.setStyleSheet("""
+            QLabel {
+                color: #4E5969;
+                font-size: 12px;
+            }
+        """)
+        desc_label.setWordWrap(True)
+        text_container.addWidget(desc_label)
+        
+        card_layout.addLayout(text_container)
+        
+        # 添加二维码图片
+        qr_label = QLabel()
+        qr_pixmap = QPixmap("wechat_pay.png")
+        scaled_pixmap = qr_pixmap.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)  # 进一步减小二维码尺寸
+        qr_label.setPixmap(scaled_pixmap)
+        qr_label.setAlignment(Qt.AlignCenter)
+        card_layout.addWidget(qr_label)
+        
+        layout.addWidget(container)
+        layout.addStretch()  # 添加弹性空间，使容器靠左对齐
+
 class ReminderApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("提醒助手")
-        self.setFixedSize(680, 580)
         
-        # 初始化语音引擎
-        self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
+        # 初始化语言设置
+        self.current_language = self.get_system_language()
+        print(f"检测到的系统语言: {self.current_language}")  # 添加调试信息
+        self.load_language()
+        
+        # 设置窗口标题
+        self.setWindowTitle(self.get_text("生活工具"))
+        self.setFixedSize(680, 580)
         
         # 配色方案 - 清新简约风格
         self.colors = {
@@ -181,7 +250,7 @@ class ReminderApp(QMainWindow):
         
         # 创建左侧边栏
         sidebar = QWidget()
-        sidebar.setFixedWidth(60)  # 恢复原来的宽度
+        sidebar.setFixedWidth(100)  # 增加宽度从60到80
         sidebar.setStyleSheet(f"""
             QWidget {{
                 background-color: {self.colors['sidebar']};
@@ -189,14 +258,15 @@ class ReminderApp(QMainWindow):
             }}
             QPushButton {{
                 background-color: transparent;
-                color: {self.colors['text_secondary']};
+                color: {self.colors['text']};  /* 修改为主文本颜色 */
                 border: none;
-                border-radius: 4px;
+                border-radius: 6px;
                 text-align: center;
                 padding: 12px 0;
-                font-size: 13px;
+                font-size: 14px;
                 min-height: 24px;
-                margin: 4px 8px;
+                margin: 4px 12px;
+                font-weight: 400;  /* 添加字重 */
             }}
             QPushButton:hover {{
                 color: {self.colors['primary']};
@@ -211,19 +281,19 @@ class ReminderApp(QMainWindow):
         
         # 创建侧边栏布局
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setSpacing(0)
-        sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        sidebar_layout.setSpacing(4)  # 增加按钮之间的间距
+        sidebar_layout.setContentsMargins(0, 12, 0, 12)  # 增加上下边距
         
         # 添加功能按钮
-        self.reminder_btn = QPushButton("提醒")
+        self.reminder_btn = QPushButton(self.get_text("提醒"))
         self.reminder_btn.setProperty("selected", True)
         self.reminder_btn.clicked.connect(lambda: self.switch_page(0))
         
-        self.sleep_btn = QPushButton("计划")
+        self.sleep_btn = QPushButton(self.get_text("计划"))
         self.sleep_btn.setProperty("selected", False)
         self.sleep_btn.clicked.connect(lambda: self.switch_page(1))
         
-        self.settings_btn = QPushButton("设置")
+        self.settings_btn = QPushButton(self.get_text("设置"))
         self.settings_btn.setProperty("selected", False)
         self.settings_btn.clicked.connect(lambda: self.switch_page(2))
         
@@ -261,10 +331,13 @@ class ReminderApp(QMainWindow):
         
         # 提醒类型选择
         type_layout = QHBoxLayout()
-        type_label = QLabel("提醒类型")
+        type_label = QLabel(self.get_text("提醒类型"))
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["喝水", "运动", "休息", "自定义"])
-        self.type_combo.currentTextChanged.connect(self.on_type_changed)
+        self.type_combo.addItems([
+            self.get_text("喝水"),
+            self.get_text("运动"),
+            self.get_text("休息")
+        ])
         type_layout.addWidget(type_label)
         type_layout.addWidget(self.type_combo)
         type_layout.setStretchFactor(type_label, 1)
@@ -275,9 +348,9 @@ class ReminderApp(QMainWindow):
         self.custom_text_widget = QWidget()
         self.custom_text_layout = QHBoxLayout(self.custom_text_widget)
         self.custom_text_layout.setContentsMargins(0, 0, 0, 0)
-        custom_text_label = QLabel("自定义文本")
+        custom_text_label = QLabel(self.get_text("自定义文本"))
         self.custom_text_input = MaterialLineEdit()
-        self.custom_text_input.setPlaceholderText("请输入提醒文本")
+        self.custom_text_input.setPlaceholderText(self.get_text("请输入提醒文本"))
         self.custom_text_layout.addWidget(custom_text_label)
         self.custom_text_layout.addWidget(self.custom_text_input)
         self.custom_text_layout.setStretchFactor(custom_text_label, 1)
@@ -287,34 +360,23 @@ class ReminderApp(QMainWindow):
         
         # 提醒间隔设置
         interval_layout = QHBoxLayout()
-        interval_label = QLabel("提醒间隔")
+        interval_label = QLabel(self.get_text("提醒间隔"))
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 120)
         self.interval_spin.setValue(30)
-        self.interval_spin.setSuffix(" 分钟")
+        self.interval_spin.setSuffix(f" {self.get_text('分钟')}")
         interval_layout.addWidget(interval_label)
         interval_layout.addWidget(self.interval_spin)
         interval_layout.setStretchFactor(interval_label, 1)
         interval_layout.setStretchFactor(self.interval_spin, 2)
         settings_layout.addLayout(interval_layout)
         
-        # 定时提醒设置
-        time_layout = QHBoxLayout()
-        time_label = QLabel("定时提醒")
-        self.time_edit = QTimeEdit()
-        self.time_edit.setTime(QTime.currentTime())
-        time_layout.addWidget(time_label)
-        time_layout.addWidget(self.time_edit)
-        time_layout.setStretchFactor(time_label, 1)
-        time_layout.setStretchFactor(self.time_edit, 2)
-        settings_layout.addLayout(time_layout)
-        
         # 添加按钮布局
         button_layout = QHBoxLayout()
         button_layout.setSpacing(16)
         
         # 开始/停止按钮
-        self.toggle_button = QPushButton("启动专注时段")
+        self.toggle_button = QPushButton(self.get_text("开始提醒"))
         self.toggle_button.setFixedWidth(160)  # 增加按钮宽度
         self.toggle_button.clicked.connect(self.toggle_reminder)
         button_layout.addWidget(self.toggle_button)
@@ -323,7 +385,10 @@ class ReminderApp(QMainWindow):
         settings_layout.addLayout(button_layout)
         
         reminder_layout.addWidget(settings_card)
-        reminder_layout.addStretch()
+        reminder_layout.addStretch()  # 添加弹性空间
+        # 添加打赏组件到提醒页面底部
+        self.reminder_donate = DonateWidget(parent=self, get_text_func=self.get_text)
+        reminder_layout.addWidget(self.reminder_donate)
         
         # 创建睡眠设置页面
         sleep_page = QWidget()
@@ -339,7 +404,7 @@ class ReminderApp(QMainWindow):
         
         # 睡眠时间设置
         sleep_time_layout = QHBoxLayout()
-        sleep_time_label = QLabel("睡眠时间")
+        sleep_time_label = QLabel(self.get_text("睡眠时间"))
         sleep_time_label.setStyleSheet(f"""
             QLabel {{
                 color: {self.colors['text']};
@@ -350,7 +415,7 @@ class ReminderApp(QMainWindow):
         self.sleep_time_spin = QSpinBox()
         self.sleep_time_spin.setRange(1, 120)
         self.sleep_time_spin.setValue(20)
-        self.sleep_time_spin.setSuffix(" 分钟")
+        self.sleep_time_spin.setSuffix(f" {self.get_text('分钟')}")
         self.sleep_time_spin.setStyleSheet(f"""
             QSpinBox {{
                 border: 1px solid {self.colors['border']};
@@ -390,7 +455,7 @@ class ReminderApp(QMainWindow):
         sleep_button_layout.setSpacing(16)
         
         # 设置睡眠按钮
-        self.sleep_button = QPushButton("设置睡眠")
+        self.sleep_button = QPushButton(self.get_text("开始睡眠"))
         self.sleep_button.setFixedWidth(160)  # 增加按钮宽度
         self.sleep_button.setStyleSheet(f"""
             QPushButton {{
@@ -403,10 +468,7 @@ class ReminderApp(QMainWindow):
                 min-height: 40px;
                 text-align: left;
                 padding-left: 20px;
-                background-image: url(play.png);
-                background-repeat: no-repeat;
-                background-position: 120px center;
-                background-size: 16px 16px;
+                position: relative;
             }}
             QPushButton:hover {{
                 background-color: #40A9FF;
@@ -414,49 +476,26 @@ class ReminderApp(QMainWindow):
             QPushButton:pressed {{
                 background-color: #096DD9;
             }}
+            QPushButton::after {{
+                content: "▶";
+                position: absolute;
+                right: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 16px;
+            }}
         """)
-        self.sleep_button.clicked.connect(self.set_sleep)
+        self.sleep_button.clicked.connect(self.toggle_sleep)
         sleep_button_layout.addWidget(self.sleep_button)
-        
-        # 取消睡眠按钮
-        self.cancel_sleep_button = QPushButton("取消睡眠")
-        self.cancel_sleep_button.setFixedWidth(160)  # 增加按钮宽度
-        self.cancel_sleep_button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #FF4D4F;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 14px;
-                min-height: 40px;
-                text-align: left;
-                padding-left: 20px;
-                background-image: url(stop.png);
-                background-repeat: no-repeat;
-                background-position: 120px center;
-                background-size: 16px 16px;
-            }}
-            QPushButton:hover {{
-                background-color: #ff7875;
-            }}
-            QPushButton:pressed {{
-                background-color: #d4380d;
-            }}
-            QPushButton:disabled {{
-                background-color: #FFB5B5;
-                color: rgba(255, 255, 255, 0.65);
-            }}
-        """)
-        self.cancel_sleep_button.clicked.connect(self.cancel_sleep)
-        self.cancel_sleep_button.setEnabled(False)
-        sleep_button_layout.addWidget(self.cancel_sleep_button)
         
         sleep_button_layout.addStretch()
         sleep_settings_layout.addLayout(sleep_button_layout)
         
         sleep_layout.addWidget(sleep_card)
-        sleep_layout.addStretch()
+        sleep_layout.addStretch()  # 添加弹性空间
+        # 添加打赏组件到睡眠页面底部
+        self.sleep_donate = DonateWidget(parent=self, get_text_func=self.get_text)
+        sleep_layout.addWidget(self.sleep_donate)
         
         # 创建设置页面
         settings_page = QWidget()
@@ -470,13 +509,76 @@ class ReminderApp(QMainWindow):
         settings_card_layout.setSpacing(20)
         settings_card_layout.setContentsMargins(24, 24, 24, 24)
         
-        # 开机自启动设置
-        self.autostart_button = QPushButton("设置开机自启")
-        self.autostart_button.clicked.connect(self.toggle_autostart)
-        settings_card_layout.addWidget(self.autostart_button)
+        # 添加语言设置
+        language_layout = QHBoxLayout()
+        language_label = QLabel(self.get_text("语言设置"))
+        self.language_combo = QComboBox()
+        self.language_combo.addItems(["中文", "English"])
+        self.language_combo.setCurrentText(self.current_language)
+        self.language_combo.currentTextChanged.connect(self.change_language)
+        self.language_combo.setStyleSheet(f"""
+            QComboBox {{
+                border: 1px solid {self.colors['border']};
+                border-radius: 6px;
+                padding: 8px 12px;
+                background-color: white;
+                color: {self.colors['text']};
+                min-height: 36px;
+                font-size: 14px;
+                selection-background-color: {self.colors['hover']};
+                selection-color: {self.colors['primary']};
+            }}
+            QComboBox:hover {{
+                border: 1px solid {self.colors['primary']};
+                background-color: {self.colors['hover']};
+            }}
+            QComboBox:focus {{
+                border: 1px solid {self.colors['primary']};
+                background-color: white;
+            }}
+            QComboBox::drop-down {{
+                width: 24px;
+                border: none;
+                background: transparent;
+            }}
+            QComboBox::down-arrow {{
+                width: 0px;
+                height: 0px;
+                border: none;
+            }}
+            QComboBox QAbstractItemView {{
+                border: 1px solid {self.colors['border']};
+                border-radius: 6px;
+                background-color: white;
+                color: {self.colors['text']};
+                selection-background-color: {self.colors['hover']};
+                selection-color: {self.colors['primary']};
+                padding: 4px;
+            }}
+            QComboBox QAbstractItemView::item {{
+                min-height: 32px;
+                padding: 4px 8px;
+                border-radius: 4px;
+            }}
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: {self.colors['hover']};
+            }}
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: {self.colors['hover']};
+                color: {self.colors['primary']};
+            }}
+        """)
+        language_layout.addWidget(language_label)
+        language_layout.addWidget(self.language_combo)
+        language_layout.setStretchFactor(language_label, 1)
+        language_layout.setStretchFactor(self.language_combo, 2)
+        settings_card_layout.addLayout(language_layout)
         
         settings_page_layout.addWidget(settings_card)
-        settings_page_layout.addStretch()
+        settings_page_layout.addStretch()  # 添加弹性空间
+        # 添加打赏组件到设置页面底部
+        self.settings_donate = DonateWidget(parent=self, get_text_func=self.get_text)
+        settings_page_layout.addWidget(self.settings_donate)
         
         # 将页面添加到堆叠部件
         self.stack.addWidget(reminder_page)
@@ -493,17 +595,19 @@ class ReminderApp(QMainWindow):
         self.reminder_thread = None
         self.reminder_running = False
         self.reminder_window = None
-        self.shell = win32com.client.Dispatch("WScript.Shell")
         self.sleep_timer = None
         
         # 设置窗口图标
-        self.setWindowIcon(QIcon("icon.ico"))
+        try:
+            self.setWindowIcon(QIcon("logo.png"))
+        except:
+            # 如果加载logo.png失败，使用默认图标
+            pixmap = QPixmap(32, 32)
+            pixmap.fill(QColor(self.colors['primary']))
+            self.setWindowIcon(QIcon(pixmap))
         
         # 创建并设置系统托盘图标
         self.setup_tray_icon()
-        
-        # 检查开机自启动状态
-        self.check_autostart()
         
         # 设置窗口居中
         self.center_window()
@@ -523,16 +627,21 @@ class ReminderApp(QMainWindow):
                 min-height: 40px;
                 text-align: left;
                 padding-left: 20px;
-                background-image: url(play.png);
-                background-repeat: no-repeat;
-                background-position: 120px center;
-                background-size: 16px 16px;
+                position: relative;
             }}
             QPushButton:hover {{
                 background-color: #40A9FF;
             }}
             QPushButton:pressed {{
                 background-color: #096DD9;
+            }}
+            QPushButton::after {{
+                content: "▶";
+                position: absolute;
+                right: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 16px;
             }}
         """)
 
@@ -548,16 +657,21 @@ class ReminderApp(QMainWindow):
                 min-height: 40px;
                 text-align: left;
                 padding-left: 20px;
-                background-image: url(stop.png);
-                background-repeat: no-repeat;
-                background-position: 120px center;
-                background-size: 16px 16px;
+                position: relative;
             }}
             QPushButton:hover {{
                 background-color: #FF7875;
             }}
             QPushButton:pressed {{
                 background-color: #D4380D;
+            }}
+            QPushButton::after {{
+                content: "⏹";
+                position: absolute;
+                right: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 16px;
             }}
         """
 
@@ -574,36 +688,70 @@ class ReminderApp(QMainWindow):
         self.type_combo.setStyleSheet(f"""
             QComboBox {{
                 border: 1px solid {self.colors['border']};
-                border-radius: 4px;
-                padding: 4px 12px;
+                border-radius: 6px;
+                padding: 8px 12px;
                 background-color: white;
                 color: {self.colors['text']};
                 min-height: 36px;
                 font-size: 14px;
+                selection-background-color: {self.colors['hover']};
+                selection-color: {self.colors['primary']};
             }}
             QComboBox:hover {{
                 border: 1px solid {self.colors['primary']};
+                background-color: {self.colors['hover']};
             }}
             QComboBox:focus {{
                 border: 1px solid {self.colors['primary']};
+                background-color: white;
             }}
             QComboBox::drop-down {{
-                width: 0;
+                width: 24px;
                 border: none;
                 background: transparent;
             }}
             QComboBox::down-arrow {{
-                width: 0;
-                height: 0;
+                width: 0px;
+                height: 0px;
                 border: none;
             }}
             QComboBox QAbstractItemView {{
                 border: 1px solid {self.colors['border']};
+                border-radius: 6px;
                 background-color: white;
                 color: {self.colors['text']};
                 selection-background-color: {self.colors['hover']};
                 selection-color: {self.colors['primary']};
+                padding: 4px;
             }}
+            QComboBox QAbstractItemView::item {{
+                min-height: 32px;
+                padding: 4px 8px;
+                border-radius: 4px;
+            }}
+            QComboBox QAbstractItemView::item:hover {{
+                background-color: {self.colors['hover']};
+            }}
+            QComboBox QAbstractItemView::item:selected {{
+                background-color: {self.colors['hover']};
+                color: {self.colors['primary']};
+            }}
+        """)
+
+        # 设置下拉箭头为 Unicode 字符
+        self.type_combo.setEditable(False)
+        self.type_combo.setInsertPolicy(QComboBox.NoInsert)
+        self.type_combo.setCurrentIndex(0)
+        self.type_combo.setStyleSheet(self.type_combo.styleSheet() + """
+            QComboBox::after {
+                content: "▼";
+                position: absolute;
+                right: 8px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: #4E5969;
+                pointer-events: none;
+            }
         """)
 
         # 修改数字输入框样式
@@ -630,35 +778,6 @@ class ReminderApp(QMainWindow):
                 background: transparent;
             }}
             QSpinBox::up-arrow, QSpinBox::down-arrow {{
-                width: 0;
-                height: 0;
-                border: none;
-            }}
-        """)
-
-        # 修改时间输入框样式
-        self.time_edit.setStyleSheet(f"""
-            QTimeEdit {{
-                border: 1px solid {self.colors['border']};
-                border-radius: 4px;
-                padding: 4px 12px;
-                background-color: white;
-                color: {self.colors['text']};
-                min-height: 36px;
-                font-size: 14px;
-            }}
-            QTimeEdit:hover {{
-                border: 1px solid {self.colors['primary']};
-            }}
-            QTimeEdit:focus {{
-                border: 1px solid {self.colors['primary']};
-            }}
-            QTimeEdit::up-button, QTimeEdit::down-button {{
-                width: 0;
-                border: none;
-                background: transparent;
-            }}
-            QTimeEdit::up-arrow, QTimeEdit::down-arrow {{
                 width: 0;
                 height: 0;
                 border: none;
@@ -713,9 +832,7 @@ class ReminderApp(QMainWindow):
                     "分钟": "分钟",
                     "打赏支持": "打赏支持",
                     "显示": "显示",
-                    "退出": "退出",
-                    "设置开机自启": "设置开机自启",
-                    "取消开机自启": "取消开机自启"
+                    "退出": "退出"
                 }
             }
             
@@ -732,8 +849,9 @@ class ReminderApp(QMainWindow):
             
     def start_reminder(self):
         """开始提醒"""
+        minutes = self.interval_spin.value()
         self.reminder_running = True
-        self.toggle_button.setText("停止专注时段")
+        self.toggle_button.setText(self.get_text("取消提醒"))
         self.toggle_button.setStyleSheet(self.stop_button_style)
         if hasattr(self, 'status_label'):
             self.status_label.setText("提醒已开启")
@@ -741,11 +859,18 @@ class ReminderApp(QMainWindow):
         self.reminder_thread.daemon = True
         self.reminder_thread.start()
         
-    def stop_reminder(self):
+        # 显示确认弹框
+        QMessageBox.information(
+            self, 
+            self.get_text("提醒设置"), 
+            self.get_text("提醒已开启，将每 {} 分钟提醒一次").format(minutes)
+        )
+        
+    def stop_reminder(self, show_dialog=True):
         """停止提醒"""
         try:
             self.reminder_running = False
-            self.toggle_button.setText("启动专注时段")
+            self.toggle_button.setText(self.get_text("开始提醒"))
             self.toggle_button.setStyleSheet(f"""
                 QPushButton {{
                     background-color: #1890FF;
@@ -757,10 +882,7 @@ class ReminderApp(QMainWindow):
                     min-height: 40px;
                     text-align: left;
                     padding-left: 20px;
-                    background-image: url(play.png);
-                    background-repeat: no-repeat;
-                    background-position: 120px center;
-                    background-size: 16px 16px;
+                    position: relative;
                 }}
                 QPushButton:hover {{
                     background-color: #40A9FF;
@@ -768,12 +890,28 @@ class ReminderApp(QMainWindow):
                 QPushButton:pressed {{
                     background-color: #096DD9;
                 }}
+                QPushButton::after {{
+                    content: "▶";
+                    position: absolute;
+                    right: 20px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 16px;
+                }}
             """)
             if hasattr(self, 'status_label'):
                 self.status_label.setText("提醒已停止")
             if self.reminder_thread and self.reminder_thread.is_alive():
                 self.reminder_thread.join(timeout=1)
             self.hide_reminder()
+            
+            # 只有在需要时才显示取消提醒的确认弹框
+            if show_dialog:
+                QMessageBox.information(
+                    self, 
+                    self.get_text("提醒设置"), 
+                    self.get_text("提醒已取消")
+                )
         except Exception as e:
             print(f"停止提醒出错: {e}")
         
@@ -784,16 +922,6 @@ class ReminderApp(QMainWindow):
         while self.reminder_running:
             try:
                 current_time = datetime.now()
-                scheduled_time = self.time_edit.time().toPython()
-                
-                # 检查是否到达定时提醒时间
-                if (current_time.time().hour == scheduled_time.hour and 
-                    current_time.time().minute == scheduled_time.minute and
-                    (current_time - last_reminder_time).seconds >= 55):  # 避免重复提醒
-                    QApplication.instance().postEvent(self, QShowReminderEvent())
-                    last_reminder_time = current_time
-                    time.sleep(5)  # 等待5秒后继续检查
-                    continue
                 
                 # 检查间隔提醒
                 interval_seconds = self.interval_spin.value() * 60
@@ -811,10 +939,7 @@ class ReminderApp(QMainWindow):
         """显示提醒"""
         try:
             reminder_type = self.type_combo.currentText()
-            if reminder_type == "自定义":
-                reminder_text = self.custom_text_input.text() or "自定义提醒"
-            else:
-                reminder_text = f"该{reminder_type}了！"
+            reminder_text = f"该{reminder_type}了！"
                 
             self.reminder_label.setText(reminder_text)
             
@@ -856,10 +981,7 @@ class ReminderApp(QMainWindow):
                 self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
             
             reminder_type = self.type_combo.currentText()
-            if reminder_type == "自定义":
-                text = self.custom_text_input.text() or "自定义提醒"
-            else:
-                text = f"该{reminder_type}了"
+            text = f"该{reminder_type}了"
             self.speaker.Speak(text)
         except Exception as e:
             print(f"播放提示音出错: {e}")
@@ -945,68 +1067,32 @@ class ReminderApp(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "错误", f"显示打赏二维码失败: {e}")
             
-    def toggle_autostart(self):
-        """切换开机自启状态"""
-        try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, 
-                               r"Software\Microsoft\Windows\CurrentVersion\Run",
-                               0, winreg.KEY_ALL_ACCESS)
-            
-            try:
-                winreg.QueryValueEx(key, "ReminderApp")
-                # 如果存在，则删除
-                winreg.DeleteValue(key, "ReminderApp")
-                self.autostart_button.setText("设置开机自启")
-            except:
-                # 如果不存在，则添加
-                app_path = os.path.abspath(sys.argv[0])
-                winreg.SetValueEx(key, "ReminderApp", 0, winreg.REG_SZ, app_path)
-                self.autostart_button.setText("取消开机自启")
-                
-            winreg.CloseKey(key)
-        except Exception as e:
-            QMessageBox.warning(self, "错误", f"设置开机自启失败: {e}")
-            
-    def check_autostart(self):
-        """检查开机自启状态"""
-        try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, 
-                               r"Software\Microsoft\Windows\CurrentVersion\Run",
-                               0, winreg.KEY_READ)
-            
-            try:
-                winreg.QueryValueEx(key, "ReminderApp")
-                self.autostart_button.setText("取消开机自启")
-            except:
-                self.autostart_button.setText("设置开机自启")
-                
-            winreg.CloseKey(key)
-        except:
-            self.autostart_button.setText("设置开机自启")
-            
     def setup_tray_icon(self):
         """设置系统托盘图标"""
         try:
             self.tray_icon = QSystemTrayIcon(self)
-            icon = QIcon("icon.ico")
-            if icon.isNull():
-                # 如果图标文件不存在，创建一个默认图标
+            # 使用logo.png作为托盘图标
+            try:
+                icon = QIcon("logo.png")
+                self.tray_icon.setIcon(icon)
+            except:
+                # 如果加载logo.png失败，使用默认图标
                 pixmap = QPixmap(32, 32)
                 pixmap.fill(QColor(self.colors['primary']))
                 icon = QIcon(pixmap)
-            self.tray_icon.setIcon(icon)
-            self.tray_icon.setToolTip("提醒助手")
+                self.tray_icon.setIcon(icon)
+            self.tray_icon.setToolTip(self.get_text("生活工具"))
             
             # 创建托盘菜单
             tray_menu = QMenu()
             
             # 添加菜单项
-            show_action = tray_menu.addAction("显示主窗口")
+            show_action = tray_menu.addAction(self.get_text("显示"))
             show_action.triggered.connect(self.show_main_window)
             
             tray_menu.addSeparator()
             
-            quit_action = tray_menu.addAction("退出程序")
+            quit_action = tray_menu.addAction(self.get_text("退出"))
             quit_action.triggered.connect(self.quit_app)
             
             # 设置托盘图标的上下文菜单
@@ -1035,13 +1121,21 @@ class ReminderApp(QMainWindow):
         """关闭窗口事件"""
         if hasattr(event, 'spontaneous') and event.spontaneous():
             # 用户通过任务栏或Alt+F4关闭
-            reply = QMessageBox.question(
-                self, 
-                "确认退出", 
-                '是否要完全退出程序？\n选择"否"将最小化到系统托盘。',
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle(self.get_text("确认退出"))
+            msg_box.setText(self.get_text("是否要完全退出程序？\n选择\"否\"将最小化到系统托盘。"))
+            msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            msg_box.setDefaultButton(QMessageBox.No)
+            
+            # 设置按钮文本
+            yes_button = msg_box.button(QMessageBox.Yes)
+            no_button = msg_box.button(QMessageBox.No)
+            if yes_button:
+                yes_button.setText(self.get_text("退出"))
+            if no_button:
+                no_button.setText(self.get_text("最小化"))
+            
+            reply = msg_box.exec()
             
             if reply == QMessageBox.Yes:
                 self.quit_app()
@@ -1049,8 +1143,8 @@ class ReminderApp(QMainWindow):
                 event.ignore()
                 self.hide()
                 self.tray_icon.showMessage(
-                    "提醒助手",
-                    "程序已最小化到系统托盘，双击图标可重新打开主窗口",
+                    self.get_text("生活工具"),
+                    self.get_text("程序已最小化到系统托盘，双击图标可重新打开主窗口"),
                     QSystemTrayIcon.Information,
                     2000
                 )
@@ -1061,8 +1155,9 @@ class ReminderApp(QMainWindow):
     def quit_app(self):
         """退出应用"""
         try:
-            # 停止所有活动
-            self.stop_reminder()
+            # 只有在提醒正在运行时才停止提醒，但不显示对话框
+            if self.reminder_running:
+                self.stop_reminder(show_dialog=False)
             
             # 隐藏托盘图标
             if hasattr(self, 'tray_icon'):
@@ -1102,7 +1197,7 @@ class ReminderApp(QMainWindow):
         reminder_layout.addWidget(self.reminder_label)
         
         # 添加关闭按钮
-        close_button = QPushButton("我知道了")
+        close_button = QPushButton(self.get_text("我知道了"))
         close_button.setStyleSheet("""
             QPushButton {
                 background-color: rgba(255, 255, 255, 0.15);
@@ -1148,10 +1243,7 @@ class ReminderApp(QMainWindow):
                 
             screen = QApplication.primaryScreen().geometry()
             reminder_type = self.type_combo.currentText()
-            if reminder_type == "自定义":
-                text = self.custom_text_input.text() or "自定义提醒"
-            else:
-                text = f"该{reminder_type}了！"
+            text = f"该{reminder_type}了！"
             
             # 创建新的弹幕标签
             danmaku = DanmakuLabel(text, self.reminder_window)
@@ -1169,34 +1261,179 @@ class ReminderApp(QMainWindow):
             return True
         return super().event(event)
 
-    def set_sleep(self):
-        """设置系统睡眠"""
+    def toggle_sleep(self):
+        """切换睡眠状态"""
+        if not hasattr(self, 'sleep_running') or not self.sleep_running:
+            self.start_sleep()
+        else:
+            self.cancel_sleep()
+
+    def start_sleep(self):
+        """开始睡眠计时"""
         minutes = self.sleep_time_spin.value()
-        self.sleep_button.setEnabled(False)
-        self.cancel_sleep_button.setEnabled(True)
+        self.sleep_running = True
+        self.sleep_button.setText(self.get_text("取消睡眠"))
+        self.sleep_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FF4D4F;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 14px;
+                min-height: 40px;
+                text-align: left;
+                padding-left: 20px;
+                position: relative;
+            }}
+            QPushButton:hover {{
+                background-color: #ff7875;
+            }}
+            QPushButton:pressed {{
+                background-color: #d4380d;
+            }}
+            QPushButton::after {{
+                content: "⏹";
+                position: absolute;
+                right: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 16px;
+            }}
+        """)
         
         # 创建定时器
         self.sleep_timer = QTimer()
         self.sleep_timer.timeout.connect(self.execute_sleep)
         self.sleep_timer.start(minutes * 60 * 1000)  # 转换为毫秒
         
-        QMessageBox.information(self, "睡眠设置", f"系统将在 {minutes} 分钟后进入睡眠模式")
+        QMessageBox.information(
+            self, 
+            self.get_text("睡眠设置"), 
+            self.get_text("系统将在 {} 分钟后进入睡眠模式").format(minutes)
+        )
         
     def cancel_sleep(self):
-        """取消系统睡眠"""
+        """取消睡眠"""
         if self.sleep_timer:
             self.sleep_timer.stop()
             self.sleep_timer = None
-            self.sleep_button.setEnabled(True)
-            self.cancel_sleep_button.setEnabled(False)
-            QMessageBox.information(self, "睡眠设置", "已取消睡眠设置")
+        self.sleep_running = False
+        self.sleep_button.setText(self.get_text("开始睡眠"))
+        self.sleep_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['primary']};
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 14px;
+                min-height: 40px;
+                text-align: left;
+                padding-left: 20px;
+                position: relative;
+            }}
+            QPushButton:hover {{
+                background-color: #40A9FF;
+            }}
+            QPushButton:pressed {{
+                background-color: #096DD9;
+            }}
+            QPushButton::after {{
+                content: "▶";
+                position: absolute;
+                right: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 16px;
+            }}
+        """)
+        QMessageBox.information(
+            self, 
+            self.get_text("睡眠设置"), 
+            self.get_text("已取消睡眠设置")
+        )
             
     def execute_sleep(self):
         """执行系统睡眠"""
         os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
-        self.sleep_button.setEnabled(True)
-        self.cancel_sleep_button.setEnabled(False)
+        self.sleep_running = False
+        self.sleep_button.setText(self.get_text("开始睡眠"))
         self.sleep_timer = None
+
+    def change_language(self, language):
+        """切换语言"""
+        self.current_language = language
+        self.update_ui_texts()
+        
+    def update_ui_texts(self):
+        """更新所有UI文本"""
+        # 更新窗口标题
+        self.setWindowTitle(self.get_text("生活工具"))
+        
+        # 更新侧边栏按钮文本
+        self.reminder_btn.setText(self.get_text("提醒"))
+        self.sleep_btn.setText(self.get_text("计划"))
+        self.settings_btn.setText(self.get_text("设置"))
+        
+        # 根据语言显示或隐藏打赏组件
+        show_donate = self.current_language == "中文"
+        if hasattr(self, 'reminder_donate'):
+            self.reminder_donate.setVisible(show_donate)
+        if hasattr(self, 'sleep_donate'):
+            self.sleep_donate.setVisible(show_donate)
+        if hasattr(self, 'settings_donate'):
+            self.settings_donate.setVisible(show_donate)
+        
+        # 更新所有标签文本
+        for widget in self.findChildren(QLabel):
+            current_text = widget.text()
+            # 遍历语言文件中的所有键，查找匹配的文本
+            for lang in ["中文", "English"]:
+                for key, value in self.language_data[lang].items():
+                    if value == current_text:
+                        widget.setText(self.get_text(key))
+                        break
+        
+        # 更新所有按钮文本
+        for widget in self.findChildren(QPushButton):
+            current_text = widget.text()
+            # 遍历语言文件中的所有键，查找匹配的文本
+            for lang in ["中文", "English"]:
+                for key, value in self.language_data[lang].items():
+                    if value == current_text:
+                        widget.setText(self.get_text(key))
+                        break
+        
+        # 更新所有下拉框文本和选项
+        self.type_combo.clear()
+        self.type_combo.addItems([
+            self.get_text("喝水"),
+            self.get_text("运动"),
+            self.get_text("休息")
+        ])
+        
+        # 更新数字输入框的后缀
+        self.interval_spin.setSuffix(f" {self.get_text('分钟')}")
+        self.sleep_time_spin.setSuffix(f" {self.get_text('分钟')}")
+
+    def get_system_language(self):
+        """获取系统语言设置"""
+        try:
+            # 通过 Windows 注册表检测系统语言
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Control Panel\International")
+            language_code = winreg.QueryValueEx(key, "Locale")[0]
+            winreg.CloseKey(key)
+            
+            print(f"检测到的语言代码: {language_code}")  # 添加调试信息
+            
+            # 0804 是简体中文的语言代码，检查是否包含这个代码
+            if "0804" in language_code:
+                return "中文"
+            return "English"
+        except Exception as e:
+            print(f"获取系统语言设置失败: {e}")
+            return "中文"  # 如果检测失败，默认使用中文
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

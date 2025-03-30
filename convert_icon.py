@@ -1,4 +1,5 @@
-from cairosvg import svg2png
+from PIL import Image
+import cairosvg
 
 # 将 SVG 转换为 PNG
-svg2png(url='icon.svg', write_to='icon.png', output_width=32, output_height=32) 
+cairosvg.svg2png(url='down_arrow.svg', write_to='down_arrow.png') 
