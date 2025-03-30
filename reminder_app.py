@@ -110,9 +110,9 @@ class DonateWidget(QWidget):
         self.setup_ui()
         
     def setup_ui(self):
-        layout = QHBoxLayout(self)  # 改为水平布局
+        layout = QHBoxLayout(self)
         layout.setSpacing(8)
-        layout.setContentsMargins(0, 0, 0, 0)  # 移除边距
+        layout.setContentsMargins(0, 0, 0, 0)
         
         # 创建卡片式容器
         container = QFrame(self)
@@ -125,14 +125,14 @@ class DonateWidget(QWidget):
             }
         """)
         
-        card_layout = QHBoxLayout(container)  # 改为水平布局
+        card_layout = QHBoxLayout(container)
         card_layout.setSpacing(8)
-        card_layout.setContentsMargins(12, 8, 12, 8)  # 减小内边距
+        card_layout.setContentsMargins(12, 8, 12, 8)
         
         # 添加文字容器
         text_container = QVBoxLayout()
-        text_container.setSpacing(2)  # 减小文字间距
-        text_container.setAlignment(Qt.AlignVCenter)  # 垂直居中对齐
+        text_container.setSpacing(2)
+        text_container.setAlignment(Qt.AlignVCenter)
         
         # 添加标题
         title_label = QLabel("❤️ " + self.get_text("支持作者"))
@@ -160,9 +160,23 @@ class DonateWidget(QWidget):
         
         # 添加二维码图片
         qr_label = QLabel()
-        qr_pixmap = QPixmap("wechat_pay.png")
-        scaled_pixmap = qr_pixmap.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)  # 进一步减小二维码尺寸
-        qr_label.setPixmap(scaled_pixmap)
+        # 获取应用程序路径
+        app_path = os.path.dirname(os.path.abspath(__file__))
+        qr_path = os.path.join(app_path, "wechat_pay.png")
+        
+        if getattr(sys, 'frozen', False):
+            # 如果是打包后的exe
+            app_path = sys._MEIPASS
+            qr_path = os.path.join(app_path, "wechat_pay.png")
+        
+        if os.path.exists(qr_path):
+            qr_pixmap = QPixmap(qr_path)
+            scaled_pixmap = qr_pixmap.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            qr_label.setPixmap(scaled_pixmap)
+        else:
+            print(f"找不到二维码图片: {qr_path}")
+            qr_label.setText("二维码加载失败")
+            
         qr_label.setAlignment(Qt.AlignCenter)
         card_layout.addWidget(qr_label)
         
@@ -599,9 +613,25 @@ class ReminderApp(QMainWindow):
         
         # 设置窗口图标
         try:
-            self.setWindowIcon(QIcon("logo.png"))
-        except:
-            # 如果加载logo.png失败，使用默认图标
+            # 获取应用程序路径
+            app_path = os.path.dirname(os.path.abspath(__file__))
+            logo_path = os.path.join(app_path, "logo.png")
+            
+            if getattr(sys, 'frozen', False):
+                # 如果是打包后的exe
+                app_path = sys._MEIPASS
+                logo_path = os.path.join(app_path, "logo.png")
+            
+            if os.path.exists(logo_path):
+                self.setWindowIcon(QIcon(logo_path))
+            else:
+                print(f"找不到logo图片: {logo_path}")
+                # 如果加载logo.png失败，使用默认图标
+                pixmap = QPixmap(32, 32)
+                pixmap.fill(QColor(self.colors['primary']))
+                self.setWindowIcon(QIcon(pixmap))
+        except Exception as e:
+            print(f"加载logo出错: {e}")
             pixmap = QPixmap(32, 32)
             pixmap.fill(QColor(self.colors['primary']))
             self.setWindowIcon(QIcon(pixmap))
@@ -1073,10 +1103,27 @@ class ReminderApp(QMainWindow):
             self.tray_icon = QSystemTrayIcon(self)
             # 使用logo.png作为托盘图标
             try:
-                icon = QIcon("logo.png")
-                self.tray_icon.setIcon(icon)
-            except:
-                # 如果加载logo.png失败，使用默认图标
+                # 获取应用程序路径
+                app_path = os.path.dirname(os.path.abspath(__file__))
+                logo_path = os.path.join(app_path, "logo.png")
+                
+                if getattr(sys, 'frozen', False):
+                    # 如果是打包后的exe
+                    app_path = sys._MEIPASS
+                    logo_path = os.path.join(app_path, "logo.png")
+                
+                if os.path.exists(logo_path):
+                    icon = QIcon(logo_path)
+                    self.tray_icon.setIcon(icon)
+                else:
+                    print(f"找不到logo图片: {logo_path}")
+                    # 如果加载logo.png失败，使用默认图标
+                    pixmap = QPixmap(32, 32)
+                    pixmap.fill(QColor(self.colors['primary']))
+                    icon = QIcon(pixmap)
+                    self.tray_icon.setIcon(icon)
+            except Exception as e:
+                print(f"加载托盘图标出错: {e}")
                 pixmap = QPixmap(32, 32)
                 pixmap.fill(QColor(self.colors['primary']))
                 icon = QIcon(pixmap)
