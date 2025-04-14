@@ -1,7 +1,7 @@
 {
     "中文": {
         "生活工具": "生活工具",
-        "提醒助手": "提醒助手",
+        "reminder_assistant": "提醒助手",
         "提醒": "提醒",
         "计划": "计划",
         "设置": "设置",
@@ -23,7 +23,7 @@
         "显示": "显示",
         "退出": "退出",
         "最小化": "最小化",
-        "我知道了": "我知道了",
+        "i_know": "我知道了",
         "确认退出": "确认退出",
         "是否要完全退出程序？\n选择\"否\"将最小化到系统托盘。": "是否要完全退出程序？\n选择\"否\"将最小化到系统托盘。",
         "程序已最小化到系统托盘，双击图标可重新打开主窗口": "程序已最小化到系统托盘，双击图标可重新打开主窗口",
@@ -34,11 +34,15 @@
         "系统将在 {} 分钟后进入睡眠模式": "系统将在 {} 分钟后进入睡眠模式",
         "已取消睡眠设置": "已取消睡眠设置",
         "支持作者": "支持作者",
-        "如果这个工具对你有帮助，欢迎微信扫码支持": "如果这个工具对你有帮助，欢迎微信扫码支持"
+        "如果这个工具对你有帮助，欢迎微信扫码支持": "如果这个工具对你有帮助，欢迎微信扫码支持",
+        "time_to_drink_water": "该喝水了！",
+        "time_to_exercise": "该运动了！",
+        "time_to_rest": "该休息了！",
+        "wechat_pay": "微信赞赏"
     },
     "English": {
         "生活工具": "Life Tools",
-        "提醒助手": "Reminder Assistant",
+        "reminder_assistant": "Reminder Assistant",
         "提醒": "Reminder",
         "计划": "Schedule",
         "设置": "Settings",
@@ -60,7 +64,7 @@
         "显示": "Show",
         "退出": "Exit",
         "最小化": "Minimize",
-        "我知道了": "I Know",
+        "i_know": "I Know",
         "确认退出": "Confirm Exit",
         "是否要完全退出程序？\n选择\"否\"将最小化到系统托盘。": "Do you want to exit completely?\nChoose \"No\" to minimize to system tray.",
         "程序已最小化到系统托盘，双击图标可重新打开主窗口": "The program has been minimized to system tray. Double-click the icon to reopen.",
@@ -71,6 +75,10 @@
         "系统将在 {} 分钟后进入睡眠模式": "System will enter sleep mode in {} minutes",
         "已取消睡眠设置": "Sleep settings cancelled",
         "支持作者": "Support Author",
-        "如果这个工具对你有帮助，欢迎微信扫码支持": "If this tool helps you, feel free to support via WeChat Pay"
+        "如果这个工具对你有帮助，欢迎微信扫码支持": "If this tool helps you, feel free to support via WeChat Pay",
+        "time_to_drink_water": "Time to drink water!",
+        "time_to_exercise": "Time to exercise!",
+        "time_to_rest": "Time to rest!",
+        "wechat_pay": "WeChat Pay"
     }
 } 

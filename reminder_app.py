@@ -119,44 +119,41 @@ class DonateWidget(QWidget):
         container.setObjectName("donateCard")
         container.setStyleSheet("""
             #donateCard {
-                background-color: white;
-                border-radius: 6px;
-                padding: 8px;
+                background-color: transparent;
+                border: none;
             }
         """)
         
-        card_layout = QHBoxLayout(container)
+        # 使用垂直布局
+        card_layout = QVBoxLayout(container)
         card_layout.setSpacing(8)
-        card_layout.setContentsMargins(12, 8, 12, 8)
-        
-        # 添加文字容器
-        text_container = QVBoxLayout()
-        text_container.setSpacing(2)
-        text_container.setAlignment(Qt.AlignVCenter)
+        card_layout.setContentsMargins(0, 0, 0, 0)  # 移除内边距
+        card_layout.setAlignment(Qt.AlignCenter)  # 居中对齐
         
         # 添加标题
         title_label = QLabel("❤️ " + self.get_text("支持作者"))
         title_label.setStyleSheet("""
             QLabel {
                 color: #1F2329;
-                font-size: 14px;
+                font-size: 16px;
                 font-weight: bold;
             }
         """)
-        text_container.addWidget(title_label)
+        title_label.setAlignment(Qt.AlignCenter)  # 文本居中对齐
+        card_layout.addWidget(title_label)
         
-        # 添加描述文本
-        desc_label = QLabel(self.get_text("如果这个工具对你有帮助，欢迎微信扫码支持"))
-        desc_label.setStyleSheet("""
+        # 添加微信支付提示
+        wechat_label = QLabel(self.get_text("wechat_pay"))
+        wechat_label.setStyleSheet("""
             QLabel {
-                color: #4E5969;
-                font-size: 12px;
+                color: #07C160;  /* 微信绿色 */
+                font-size: 14px;
+                font-weight: bold;
+                font-family: "Microsoft YaHei", "微软雅黑";
             }
         """)
-        desc_label.setWordWrap(True)
-        text_container.addWidget(desc_label)
-        
-        card_layout.addLayout(text_container)
+        wechat_label.setAlignment(Qt.AlignCenter)
+        card_layout.addWidget(wechat_label)
         
         # 添加二维码图片
         qr_label = QLabel()
@@ -171,8 +168,11 @@ class DonateWidget(QWidget):
         
         if os.path.exists(qr_path):
             qr_pixmap = QPixmap(qr_path)
-            scaled_pixmap = qr_pixmap.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            # 增加二维码大小到 180x180
+            scaled_pixmap = qr_pixmap.scaled(180, 180, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             qr_label.setPixmap(scaled_pixmap)
+            # 设置最小尺寸以确保二维码显示完整
+            qr_label.setMinimumSize(180, 180)
         else:
             print(f"找不到二维码图片: {qr_path}")
             qr_label.setText("二维码加载失败")
@@ -978,32 +978,108 @@ class ReminderApp(QMainWindow):
                 time.sleep(1)
             
     def show_reminder(self):
-        """显示提醒"""
+        """显示提醒窗口"""
         try:
-            reminder_type = self.type_combo.currentText()
-            reminder_text = f"该{reminder_type}了！"
+            # 如果提醒窗口不存在，创建它
+            if not hasattr(self, 'reminder_window') or self.reminder_window is None:
+                self.reminder_window = QWidget()
+                self.reminder_window.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+                self.reminder_window.setAttribute(Qt.WA_TranslucentBackground)
+                self.reminder_window.setStyleSheet("""
+                    QWidget {
+                        background-color: rgba(0, 0, 0, 0.7);
+                    }
+                """)
                 
-            self.reminder_label.setText(reminder_text)
+                # 创建主布局
+                reminder_layout = QVBoxLayout(self.reminder_window)
+                reminder_layout.setSpacing(20)
+                reminder_layout.setContentsMargins(40, 40, 40, 40)
+                
+                # 创建标题标签
+                self.reminder_title_label = QLabel()
+                self.reminder_title_label.setStyleSheet("""
+                    QLabel {
+                        color: white;
+                        font-size: 36px;
+                        font-weight: bold;
+                        font-family: "Microsoft YaHei", "微软雅黑";
+                    }
+                """)
+                self.reminder_title_label.setAlignment(Qt.AlignCenter)
+                reminder_layout.addWidget(self.reminder_title_label)
+                
+                # 创建提示标签
+                self.reminder_message_label = QLabel()
+                self.reminder_message_label.setStyleSheet("""
+                    QLabel {
+                        color: white;
+                        font-size: 24px;
+                        font-family: "Microsoft YaHei", "微软雅黑";
+                    }
+                """)
+                self.reminder_message_label.setAlignment(Qt.AlignCenter)
+                reminder_layout.addWidget(self.reminder_message_label)
+                
+                # 创建关闭按钮
+                self.reminder_close_button = QPushButton()
+                self.reminder_close_button.setCursor(Qt.PointingHandCursor)
+                self.reminder_close_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255, 255, 255, 0.15);
+                        color: white;
+                        padding: 15px 30px;
+                        border-radius: 25px;
+                        font-size: 18px;
+                        min-width: 200px;
+                        border: 2px solid rgba(255, 255, 255, 0.3);
+                    }
+                    QPushButton:hover {
+                        background-color: rgba(255, 255, 255, 0.25);
+                        border: 2px solid rgba(255, 255, 255, 0.5);
+                    }
+                """)
+                self.reminder_close_button.clicked.connect(self.hide_reminder)
+                reminder_layout.addWidget(self.reminder_close_button, alignment=Qt.AlignCenter)
+                
+                # 设置定时器用于自动隐藏提醒
+                self.hide_timer = QTimer(self)
+                self.hide_timer.timeout.connect(self.hide_reminder)
+                self.hide_timer.setSingleShot(True)
+                
+                # 设置定时器用于弹幕效果
+                self.danmaku_timer = QTimer(self)
+                self.danmaku_timer.timeout.connect(self.add_danmaku)
+                
+                # 初始化弹幕计数器
+                self.danmaku_count = 0
+                self.max_danmaku = 30  # 增加最大弹幕数量到30个
             
-            # 设置全屏显示
-            screen = QApplication.primaryScreen().geometry()
-            self.reminder_window.setGeometry(screen)
-            self.reminder_window.show()
+            # 更新提醒窗口文本
+            self.reminder_title_label.setText(self.get_text("reminder_assistant"))
             
-            # 重置弹幕计数器
-            self.danmaku_count = 0
+            reminder_type = self.type_combo.currentText().lower()
+            if reminder_type == "drink water":
+                reminder_type = "drink_water"
+            elif reminder_type == "exercise":
+                reminder_type = "exercise"
+            elif reminder_type == "rest":
+                reminder_type = "rest"
+            self.reminder_message_label.setText(self.get_text(f"time_to_{reminder_type}"))
             
-            # 开始弹幕效果，每600毫秒添加一个新弹幕
-            self.danmaku_timer.start(600)
+            self.reminder_close_button.setText(self.get_text("i_know"))
             
-            # 播放提示音
-            self.play_sound()
+            # 显示窗口
+            self.reminder_window.showFullScreen()
             
-            # 30秒后自动隐藏
+            # 开始弹幕效果
+            self.danmaku_timer.start(500)  # 每0.5秒添加一个新弹幕
+            
+            # 设置自动隐藏定时器（30秒后自动隐藏）
             self.hide_timer.start(30000)
         except Exception as e:
             print(f"显示提醒窗口出错: {e}")
-        
+
     def hide_reminder(self):
         """隐藏提醒"""
         try:
@@ -1016,18 +1092,6 @@ class ReminderApp(QMainWindow):
         except Exception as e:
             print(f"隐藏提醒窗口出错: {e}")
         
-    def play_sound(self):
-        """播放提示音"""
-        try:
-            if not hasattr(self, 'speaker'):
-                self.speaker = win32com.client.Dispatch("SAPI.SpVoice")
-            
-            reminder_type = self.type_combo.currentText()
-            text = f"该{reminder_type}了"
-            self.speaker.Speak(text)
-        except Exception as e:
-            print(f"播放提示音出错: {e}")
-            
     def show_donate(self):
         """显示打赏二维码"""
         try:
@@ -1256,8 +1320,8 @@ class ReminderApp(QMainWindow):
         reminder_layout.addWidget(self.reminder_label)
         
         # 添加关闭按钮
-        close_button = QPushButton(self.get_text("我知道了"))
-        close_button.setStyleSheet("""
+        self.reminder_close_button = QPushButton(self.get_text("i_know"))
+        self.reminder_close_button.setStyleSheet("""
             QPushButton {
                 background-color: rgba(255, 255, 255, 0.15);
                 color: white;
@@ -1272,8 +1336,8 @@ class ReminderApp(QMainWindow):
                 border: 2px solid rgba(255, 255, 255, 0.5);
             }
         """)
-        close_button.clicked.connect(self.hide_reminder)
-        reminder_layout.addWidget(close_button, alignment=Qt.AlignCenter)
+        self.reminder_close_button.clicked.connect(self.hide_reminder)
+        reminder_layout.addWidget(self.reminder_close_button, alignment=Qt.AlignCenter)
         
         # 设置定时器用于自动隐藏提醒
         self.hide_timer = QTimer(self)
@@ -1283,11 +1347,6 @@ class ReminderApp(QMainWindow):
         # 设置定时器用于弹幕效果
         self.danmaku_timer = QTimer(self)
         self.danmaku_timer.timeout.connect(self.add_danmaku)
-        
-        # 设置定时器用于播放提示音
-        self.sound_timer = QTimer(self)
-        self.sound_timer.timeout.connect(self.play_sound)
-        self.sound_timer.setSingleShot(True)
         
         # 初始化弹幕计数器
         self.danmaku_count = 0
@@ -1301,8 +1360,14 @@ class ReminderApp(QMainWindow):
                 return
                 
             screen = QApplication.primaryScreen().geometry()
-            reminder_type = self.type_combo.currentText()
-            text = f"该{reminder_type}了！"
+            reminder_type = self.type_combo.currentText().lower()
+            if reminder_type == "drink water":
+                reminder_type = "drink_water"
+            elif reminder_type == "exercise":
+                reminder_type = "exercise"
+            elif reminder_type == "rest":
+                reminder_type = "rest"
+            text = self.get_text(f"time_to_{reminder_type}")
             
             # 创建新的弹幕标签
             danmaku = DanmakuLabel(text, self.reminder_window)
@@ -1437,6 +1502,10 @@ class ReminderApp(QMainWindow):
         self.reminder_btn.setText(self.get_text("提醒"))
         self.sleep_btn.setText(self.get_text("计划"))
         self.settings_btn.setText(self.get_text("设置"))
+        
+        # 更新全屏提醒窗口的按钮文本
+        if hasattr(self, 'reminder_close_button'):
+            self.reminder_close_button.setText(self.get_text("i_know"))
         
         # 根据语言显示或隐藏打赏组件
         show_donate = self.current_language == "中文"
