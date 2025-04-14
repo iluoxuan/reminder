@@ -9,7 +9,8 @@ a = Analysis(
     datas=[
         ('logo.png', '.'),
         ('wechat_pay.png', '.'),
-        ('language.json', '.')
+        ('language.json', '.'),
+        ('favicon.ico', '.')
     ],
     hiddenimports=['win32com.client'],
     hookspath=[],
@@ -44,5 +45,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='logo.png'
+    icon='favicon.ico'
 ) 

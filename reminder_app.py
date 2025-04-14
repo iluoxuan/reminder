@@ -846,8 +846,20 @@ class ReminderApp(QMainWindow):
     def load_language(self):
         """加载语言配置"""
         try:
-            with open('language.json', 'r', encoding='utf-8') as f:
+            # 获取应用程序路径
+            if getattr(sys, 'frozen', False):
+                # 如果是打包后的exe
+                app_path = sys._MEIPASS
+            else:
+                # 如果是直接运行的python脚本
+                app_path = os.path.dirname(os.path.abspath(__file__))
+            
+            language_file = os.path.join(app_path, 'language.json')
+            print(f"尝试加载语言文件: {language_file}")  # 添加调试信息
+            
+            with open(language_file, 'r', encoding='utf-8') as f:
                 self.language_data = json.load(f)
+                print(f"成功加载语言文件，当前语言: {self.current_language}")  # 添加调试信息
         except Exception as e:
             print(f"加载语言文件失败: {e}")
             self.language_data = {
@@ -1411,6 +1423,9 @@ class ReminderApp(QMainWindow):
     def change_language(self, language):
         """切换语言"""
         self.current_language = language
+        # 重新加载语言文件
+        self.load_language()
+        # 更新所有UI文本
         self.update_ui_texts()
         
     def update_ui_texts(self):
@@ -1463,6 +1478,20 @@ class ReminderApp(QMainWindow):
         # 更新数字输入框的后缀
         self.interval_spin.setSuffix(f" {self.get_text('分钟')}")
         self.sleep_time_spin.setSuffix(f" {self.get_text('分钟')}")
+        
+        # 更新提醒按钮文本
+        if hasattr(self, 'toggle_button'):
+            if self.reminder_running:
+                self.toggle_button.setText(self.get_text("取消提醒"))
+            else:
+                self.toggle_button.setText(self.get_text("开始提醒"))
+        
+        # 更新睡眠按钮文本
+        if hasattr(self, 'sleep_button'):
+            if hasattr(self, 'sleep_running') and self.sleep_running:
+                self.sleep_button.setText(self.get_text("取消睡眠"))
+            else:
+                self.sleep_button.setText(self.get_text("开始睡眠"))
 
     def get_system_language(self):
         """获取系统语言设置"""
