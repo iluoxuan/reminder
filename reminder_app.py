@@ -1003,7 +1003,7 @@ class ReminderApp(QMainWindow):
                         color: white;
                         font-size: 36px;
                         font-weight: bold;
-                        font-family: "Microsoft YaHei", "微软雅黑";
+                        font-family: "Arial", "Microsoft YaHei", "微软雅黑";
                     }
                 """)
                 self.reminder_title_label.setAlignment(Qt.AlignCenter)
@@ -1015,7 +1015,7 @@ class ReminderApp(QMainWindow):
                     QLabel {
                         color: white;
                         font-size: 24px;
-                        font-family: "Microsoft YaHei", "微软雅黑";
+                        font-family: "Arial", "Microsoft YaHei", "微软雅黑";
                     }
                 """)
                 self.reminder_message_label.setAlignment(Qt.AlignCenter)
@@ -1308,6 +1308,7 @@ class ReminderApp(QMainWindow):
                 color: rgba(255, 255, 255, 0.95);
                 font-size: 48px;
                 font-weight: bold;
+                font-family: "Arial", "Microsoft YaHei", "微软雅黑";
             }
         """)
         
@@ -1315,9 +1316,15 @@ class ReminderApp(QMainWindow):
         reminder_layout.setAlignment(Qt.AlignCenter)
         reminder_layout.setSpacing(30)
         
-        self.reminder_label = QLabel()
-        self.reminder_label.setAlignment(Qt.AlignCenter)
-        reminder_layout.addWidget(self.reminder_label)
+        # 创建标题标签
+        self.reminder_title_label = QLabel()
+        self.reminder_title_label.setAlignment(Qt.AlignCenter)
+        reminder_layout.addWidget(self.reminder_title_label)
+        
+        # 创建消息标签
+        self.reminder_message_label = QLabel()
+        self.reminder_message_label.setAlignment(Qt.AlignCenter)
+        reminder_layout.addWidget(self.reminder_message_label)
         
         # 添加关闭按钮
         self.reminder_close_button = QPushButton(self.get_text("i_know"))
@@ -1371,6 +1378,14 @@ class ReminderApp(QMainWindow):
             
             # 创建新的弹幕标签
             danmaku = DanmakuLabel(text, self.reminder_window)
+            # 设置弹幕字体
+            danmaku.setStyleSheet("""
+                QLabel {
+                    color: white;
+                    font-size: 24px;
+                    font-family: "Arial", "Microsoft YaHei", "微软雅黑";
+                }
+            """)
             danmaku.show()
             danmaku.start_animation(screen.width())
             
